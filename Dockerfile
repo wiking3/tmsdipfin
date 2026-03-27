@@ -1,5 +1,4 @@
 FROM python:3.12-slim AS builder
-
 WORKDIR /app
 #python logs to stdout 
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -18,7 +17,6 @@ RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt
 
 # Финальный образ
 FROM python:3.12-slim
-
 WORKDIR /app
 
 # Только runtime зависимости MySQL
@@ -31,8 +29,6 @@ COPY --from=builder /wheels /wheels
 RUN pip install --no-cache-dir /wheels/*
 
 COPY . .
-
 RUN chmod +x flask-entrypoint.sh
-
 EXPOSE 5000
 CMD ["./flask-entrypoint.sh"]
