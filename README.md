@@ -8,7 +8,7 @@
 
 Запуск приложение проихводится через отдельный  BASH-скрипт flask-entrypoint.sh : 
 Инициализация БД : 
-  <span style="color:red">  flask db init </span>
+  <span style="color:red"> `flask db init ` </span>
   <span style="color:red">  flask db migrate -m 'create initial tables' </span>
   <span style="color:red">  flask db upgrade   </span>
   
