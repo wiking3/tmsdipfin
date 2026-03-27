@@ -28,3 +28,4 @@ Ansible-выполняет через плейбуки следующие зад
  -deploy-nginx - устанавливает nginx на сервера роли frontend и настраивает через шаблон j2.
  -frontend-ha - устанавливает keepalived и настраивает через шаблон j2. 
  -conf-iptabels  - на сервера роли frontends настраивает iptables (разрешает tcp/22, tcp/80, tcp/443, VRRP, icmp).
+ -install-zabbix - установка zabbix-agent2 на все сервера (4 шт). 
