@@ -35,4 +35,4 @@ Ansible-выполняет через плейбуки следующие зад
   HOSTF1: 192.168.100.121  
   HOSTF2: 192.168.100.122  
   runner1 :  192.168.100.116         \- (docker executor) \- для деплоя приложения на сервера HOSTB1-B2  
-  RUN4SHELL : 192.168.100.131 \- (shell executor) \- для выполнения ansible playbook \- для настройки инфраструктуры.  
+  RUN4SHELL : 192.168.100.131 \- (shell executor) \- для выполнения ansible playbook \- для настройки инфраструктуры (все 4 сервера HOSTF1-F2, HOSTB1-B2).
