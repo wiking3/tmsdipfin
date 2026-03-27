@@ -11,23 +11,23 @@ RUN apt-get update && apt-get install -y --no-install-recommends \          # к
     && rm -rf /var/lib/apt/lists/*                                          # удаляет кэш пакетов
 
 COPY requirements.txt .                                                    
-# Копируем wheels для кэширования
 RUN pip wheel --no-cache-dir --no-deps --wheel-dir /wheels -r requirements.txt         # собираем whl-файл для пакетов из requirements.txt в директорию /wheels  
 
-# Финальный образ
-FROM python:3.12-slim                     # 2й этап  multi-stage  
+
+FROM python:3.12-slim                     # 2й этап  multi-stage - runtime 
 WORKDIR /app                              
 
-# Только runtime зависимости MySQL
-RUN apt-get update && apt-get install -y --no-install-recommends \
+
+RUN apt-get update && apt-get install -y --no-install-recommends \       # Только runtime зависимости MySQL
     default-libmysqlclient-dev  \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем wheels и устанавливаем
-COPY --from=builder /wheels /wheels
-RUN pip install --no-cache-dir /wheels/*
 
-COPY . .
-RUN chmod +x flask-entrypoint.sh
+COPY --from=builder /wheels /wheels                                     # Из 1ого этапа копируем  whl-файлы без зафисимостей и мусора
+RUN pip install --no-cache-dir /wheels/*                                # устанавливаем whl-архивы в папку /wheels/
+
+COPY . .                                                                
+RUN chmod +x flask-entrypoint.sh                                        
 EXPOSE 5000
-CMD ["./flask-entrypoint.sh"]
+CMD ["./flask-entrypoint.sh"]                                           # определяем что докер-контейнер при запуске выполняет bash-скрипт (так как нам нужно выполнить команды flask db init, flask db migrate -m 'create initial tables',
+                                                                          flask db upgrade + подождать пока подымется контенер с MySQL и создать пользователей через  flask create-user  user pass и в конце запустить Flask-приложение : exec  flask run --host 0.0.0.0 --port 5000 )
