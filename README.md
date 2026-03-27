@@ -37,15 +37,15 @@ Ansible-выполняет через плейбуки следующие зад
   runner1 :  192.168.100.116         \- (docker executor) \- для деплоя приложения на сервера HOSTB1-B2  
   RUN4SHELL : 192.168.100.131 \- (shell executor) \- для выполнения ansible playbook \- для настройки инфраструктуры (все 4 сервера HOSTF1-F2, HOSTB1-B2).
 
-P.S.#1  Dockerfile написан как Multi-stage сложнее и дольше на +20 сек при билде но экономит с 1,8 GB до 300 MB места.
-P.S.#2  Сертификаты для HTTPS сгенерированы через certbot (через DNS-запись) через Lets Encrypt. P.S.#2
-P.S.#3  Проверка сервис keepalived использует проверку-скрипт для проверки живой ли сервис nginx.
-vrrp_script chk_nginx {
-    script "/usr/bin/curl --connect-timeout 1 http://127.0.0.1/health"
-    interval 2
-    rise 2
-    fall 2
-    timeout 1
-    weight -60
+P.S.\#1  Dockerfile написан как Multi-stage сложнее и дольше на \+20 сек при билде но экономит с 1,8 GB до 300 MB места.  
+P.S.\#2  Сертификаты для HTTPS сгенерированы через certbot (через DNS-запись) через Lets Encrypt. P.S.\#2  
+P.S.\#3  Проверка сервис keepalived использует проверку-скрипт для проверки живой ли сервис nginx.  
+vrrp\_script chk\_nginx {  
+    script "/usr/bin/curl \--connect-timeout 1 http://127.0.0.1/health"  
+    interval 2  
+    rise 2  
+    fall 2  
+    timeout 1  
+    weight \-60 
+}  
 
-}
