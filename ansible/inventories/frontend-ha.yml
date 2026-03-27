@@ -1,0 +1,14 @@
+all:
+  children:
+    frontend_servers:
+      hosts:
+        U22DIPF1:
+          ansible_host: 192.168.100.121
+        U22DIPF2:
+          ansible_host: 192.168.100.122
+      vars:
+        ansible_user: ansible
+        ansible_ssh_private_key_file: "~/.ssh/ansible_id_rsa"
+        vip_address: "192.168.100.100/24"
+        network_interface: "ens160"
+        keepalived_vrid: 51

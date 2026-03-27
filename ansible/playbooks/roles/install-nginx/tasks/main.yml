@@ -1,0 +1,92 @@
+---
+- name: Install NGINX
+  apt:
+    name: nginx
+    state: present
+    update_cache: yes
+  become: yes   
+  notify: reload nginx
+
+- name: Create /etc/nginx/conf.d/dir   
+  file:
+    path: /etc/nginx/conf.d
+    state: directory
+    mode: '0755'
+  become: yes
+
+- name: Create upstreams config
+  copy:
+    dest: /etc/nginx/conf.d/upstreams.conf
+    content: |
+      upstream backend_servers {        
+        server 192.168.100.123:5000 max_fails=3 fail_timeout=30s;
+        server 192.168.100.124:5000 max_fails=3 fail_timeout=30s backup;
+        least_conn;  # Use least connections for load balancing
+      }
+    mode: '0644'
+  become: yes  
+  notify: reload nginx 
+
+- name: Ensure SSL directory exists
+  file:
+    path: /etc/ssl/certs
+    state: directory
+    mode: '0755'
+  become: yes             
+
+- name: Copy Public SSL cert from  GitLab CI variable
+  copy:
+    content: "{{ lookup('env', 'w_altezza_org_crt') }}"
+    dest: /etc/nginx/ssl/tmsdipfin.altezza.org.crt
+    mode: '0644'
+  become: yes   
+#    no_log: true  # Hide cert info in logs
+  notify: reload nginx
+
+- name: Copy Private SSL cert from  GitLab CI variable  
+  copy:
+    content: "{{ lookup('env', 'w_altezza_org_key') }}"
+    dest: /etc/nginx/ssl/tmsdipfin.altezza.org.key
+    mode: '0600'
+  no_log: true  # Hide private key in logs
+  become: yes 
+  notify: reload nginx
+
+
+- name: Set SSL cert permissions
+  file:
+    path: "{{ item }}"
+    mode: '0640'
+    owner: www-data
+    group: www-data
+  loop:
+    - "{{ ssl_cert_path }}"
+    - "{{ ssl_key_path }}"
+  become: yes  
+
+   
+
+- name: Generate NGINX config from template
+  template:
+    src: nginx.conf.j2
+    dest: /etc/nginx/sites-available/{{ site_domain }}
+    mode: '0644'
+    
+  become: yes
+  notify: reload nginx
+
+- name: Activate site (create symlink)
+  file:
+    src: /etc/nginx/sites-available/{{ site_domain }}
+    dest: /etc/nginx/sites-enabled/{{ site_domain }}
+    state: link
+  become: yes
+  notify: reload nginx  
+
+- name: Delete default nginx config
+  file:
+    path: /etc/nginx/sites-enabled/default
+    state: absent
+  become: yes
+  notify: reload nginx
+

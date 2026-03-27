@@ -1,0 +1,7 @@
+---
+- name: Install Keepalived HA
+  hosts: frontend_servers
+  gather_facts: yes
+  become: yes
+  roles:
+    - frontend-ha

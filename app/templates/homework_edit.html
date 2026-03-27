@@ -1,0 +1,17 @@
+{% extends "base.html" %}
+{% block title %}Редактирование ДЗ{% endblock %}
+{% block content %}
+<h2>Редактирование домашнего задания</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  {{ form.title.label }} {{ form.title(class="form-control") }}
+  <br>
+  {{ form.content.label }} {{ form.content(class="form-control") }}
+  <br>
+  {{ form.publish_date.label }} {{ form.publish_date(class="form-control") }}
+  <br>
+  {{ form.deadline.label }} {{ form.deadline(class="form-control") }}
+  <br>
+  {{ form.submit(class="btn btn-primary") }}
+</form>
+{% endblock %}

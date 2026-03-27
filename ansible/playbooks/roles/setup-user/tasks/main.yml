@@ -1,0 +1,25 @@
+---
+- name: Create user
+  user:
+    name: "{{ new_user }}"
+    groups: "{{ new_user }},sudo"  # Add sudo for admin access
+    shell: /bin/bash
+    create_home: yes
+    state: present
+    append: yes  # Don't overwrite existing groups
+
+- name: Ensure .ssh directory exists
+  file:
+    path: "/home/{{ new_user }}/.ssh"
+    state: directory
+    owner: "{{ new_user }}"
+    group: "{{ new_user }}"
+    mode: '0700'
+  
+- name: Add SSH public key
+  authorized_key:
+    user: "{{ new_user }}"
+    key: "{{ ssh_public_key }}"
+    state: present
+    exclusive: false  # Keep other keys
+  notify: restart ssh  # Triggers handler on change 

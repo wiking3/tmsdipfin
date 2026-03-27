@@ -1,0 +1,89 @@
+- name: Install iptables-persistent
+  ansible.builtin.apt:
+    name: iptables-persistent
+    state: present
+    update_cache: yes
+  when: ansible_os_family == "Debian"
+
+
+- name: Set default INPUT policy to ACCEPT
+  ansible.builtin.iptables:
+    chain: INPUT
+    policy: ACCEPT
+  notify: save iptables    
+
+- name: Flush existing iptables rules
+  ansible.builtin.iptables:
+    chain: INPUT
+    flush: yes
+  notify: save iptables
+
+- name: Allow VRRP, ICMP and multicast for HA
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: "{{ item.protocol | default(omit) }}"
+    destination: "{{ item.destination | default(omit) }}"
+    jump: ACCEPT
+    comment: "{{ ansible_hostname }} - {{ item.comment | default('Allow HA') }}"
+  loop:
+    - protocol: vrrp                    # VRRP (протокол 112)
+    - protocol: icmp                    # ICMP
+    - destination: 224.0.0.18/32       # VRRP multicast
+    - destination: 224.0.0.0/8         # Multicast range
+  notify: save iptables
+
+- name: Allow outgoing VRRP and ICMP on OUTPUT  chain
+  ansible.builtin.iptables:
+    table: filter
+    chain: OUTPUT
+    protocol: "{{ item }}"
+    jump: ACCEPT
+  loop:
+    - vrrp
+    - icmp
+  notify: save iptables
+
+
+- name: Set default OUTPUT policy to ACCEPT
+  ansible.builtin.iptables:
+    chain: OUTPUT
+    policy: ACCEPT
+  notify: save iptables
+
+- name: Allow loopback traffic
+  ansible.builtin.iptables:
+    chain: INPUT
+    in_interface: lo
+    jump: ACCEPT
+    comment: "{{ ansible_hostname }} - Allow loopback"
+  notify: save iptables
+
+- name: Allow established/related connections
+  ansible.builtin.iptables:
+    chain: INPUT
+    ctstate: ESTABLISHED,RELATED
+    jump: ACCEPT
+    comment: "{{ ansible_hostname }} - Allow established"
+  notify: save iptables
+
+- name: Allow specific TCP ports
+  ansible.builtin.iptables:
+    chain: INPUT
+    protocol: tcp
+    destination_port: "{{ item }}"
+    ctstate: NEW
+    jump: ACCEPT
+    comment: "{{ ansible_hostname }} - Allow {{ item }}"
+  loop: "{{ allowed_ports }}"
+  notify: save iptables
+
+- name: Set default INPUT policy to DROP
+  ansible.builtin.iptables:
+    chain: INPUT
+    policy: DROP
+  notify: save iptables  
+
+- name: Check iptables status
+  ansible.builtin.shell: iptables -L INPUT -v -n
+  register: iptables_status
+

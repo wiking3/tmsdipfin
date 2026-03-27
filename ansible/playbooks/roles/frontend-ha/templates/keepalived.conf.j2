@@ -1,0 +1,53 @@
+global_defs {
+    router_id {{ inventory_hostname }}
+    enable_script_security
+}
+
+vrrp_script chk_nginx {
+    script "/usr/bin/curl --connect-timeout 1 http://127.0.0.1/health"
+    interval 2
+    rise 2
+    fall 2
+    timeout 1
+    weight -60
+
+}
+
+vrrp_instance VI_NGINX {
+    state {{ "MASTER" if inventory_hostname == 'U22DIPF1' else "BACKUP" }}
+    interface {{ ansible_default_ipv4.interface }}
+    virtual_router_id {{ keepalived_vrid }}
+    priority {{ 150 if inventory_hostname == 'U22DIPF1' else 100 }}
+    advert_int 1
+    preempt_delay 2
+    
+    
+    authentication {
+        auth_type PASS
+        auth_pass {{ lookup('env','KEEPALIVED_PASSWORD') | default('nginx-ha') }}
+        
+    }
+    
+    {% if inventory_hostname == 'U22DIPF1' %}
+    unicast_src_ip 192.168.100.121
+    unicast_peer {
+        192.168.100.122
+    }
+    {% else %}
+    unicast_src_ip 192.168.100.122
+    unicast_peer {
+        192.168.100.121
+    }
+    {% endif %}
+    
+    virtual_ipaddress {
+        {{ vip_address }}
+    }
+    
+    track_script {
+        chk_nginx
+    }
+    
+    notify_master "/bin/systemctl reload nginx "
+    notify_backup "/bin/systemctl reload nginx"
+}

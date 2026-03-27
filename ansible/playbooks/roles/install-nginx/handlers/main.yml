@@ -1,0 +1,19 @@
+---
+- name: reload nginx
+  systemd:
+    name: nginx
+    state: reloaded       # Graceful reload конфига
+  become: yes  
+  listen: reload nginx
+
+- name: Stop nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: stopped
+  listen: "stop nginx"
+
+- name: Start nginx
+  ansible.builtin.systemd:
+    name: nginx
+    state: started
+  listen: "start nginx"

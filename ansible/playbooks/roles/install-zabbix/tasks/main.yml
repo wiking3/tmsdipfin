@@ -1,0 +1,58 @@
+---
+- name: Ensure dependencies
+  ansible.builtin.apt:
+    name:
+      - wget
+    state: present
+    update_cache: yes
+
+- name: Download Zabbix release package for 7.0 on Ubuntu 22.04
+  ansible.builtin.get_url:
+    url: "{{ zabbix_agent_repo_url }}"
+    dest: "/tmp/{{ zabbix_agent_release_pkg }}"
+    mode: "0644"
+  become: yes  
+
+- name: Install Zabbix release package
+  ansible.builtin.apt:
+    deb: "/tmp/{{ zabbix_agent_release_pkg }}"
+  register: zabbix_release_result
+  failed_when: false    #  if "later version already installed" - dont fail task
+  become: yes  
+
+- name: Update apt cache after adding repo
+  apt:
+    update_cache: yes
+
+- name: Install zabbix-agent2 for Zabbix 7.0
+  apt:
+    name: zabbix-agent2
+    state: present
+  become: yes  
+
+- name: Ensure log directory exists
+  file:
+    path: "{{ (zabbix_agent_log_file | dirname) }}"
+    state: directory
+    owner: zabbix
+    group: zabbix
+    mode: "0755"
+  become: yes  
+
+- name: Deploy zabbix_agent2.conf from template
+  template:
+    src: zabbix_agent2.conf.j2
+    dest: /etc/zabbix/zabbix_agent2.conf
+    owner: root
+    group: zabbix
+    mode: "0640"
+    backup: yes  # backup old configuration /etc/zabbix/zabbix_agent.conf
+  notify: restart zabbix-agent2
+  become: yes
+
+- name: Ensure zabbix-agent2 enabled and started
+  ansible.builtin.systemd:
+    name: "{{ zabbix_systemd_service }}"
+    enabled: yes
+    state: started
+  become: yes  

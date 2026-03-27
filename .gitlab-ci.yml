@@ -1,0 +1,408 @@
+stages:
+  - lint
+  - create-env
+  - build
+  - deploy-ansible-ssh-user
+  - install-docker-on-backends
+  - deploy-app-hostb1
+  - deploy-app-hostb2
+  - healthcheck-b1
+  - healthcheck-b2
+  - cleanup-env-files
+  - install-nginx-f2
+  - install-nginx-f1
+  - install-keepalived-f1
+  - install-keepalived-f2
+  - conf-iptables-frontend
+  - install-zabbix
+ 
+
+
+variables:
+  DOCKER_USER: wiking3
+  REPO: wiking3/tmsdipfin
+  IMAGE_TAG: latest
+  PRJ_NAME: TMSDIP
+  ANSIBLE_SSH_USER: ansible
+  REGISTRY: https://index.docker.io/v1/
+  PRJ_DIR: /home/ansible/tmsdipfin
+  HOSTB1: 192.168.100.123
+  HOSTB2: 192.168.100.124
+  HOSTF1: 192.168.100.121
+  HOSTF2: 192.168.100.122
+  PRJ_CI_DIR: /home/ubuntu/tmsdipfin
+  RUNNER_HOST: 192.168.100.116 
+  
+
+lint-code:
+  stage: lint  
+  image: python:3.12
+  before_script: 
+    - pip install --upgrade pip                  #[notice] A new release of pip is available: 25.0.1 -> 26.0.1 
+    - pip install pylint
+    - pip install -r requirements.txt 
+  script:
+    - echo $PWD
+    - cd app
+    - pylint  *.py --disable=import-error,missing-docstring     #don`t check documentation comment and import puthon module error
+  allow_failure: true                                           
+  cache:
+    paths:
+      - .cache/pylint/
+  tags:
+    - runner1 
+
+create-env:
+  stage: create-env
+  image: alpine
+  variables:
+    SSH_OPTIONS: "-i ~/.ssh/ubuntu_id_rsa -o StrictHostKeyChecking=no "
+  script:
+    - |
+      cat > .env <<EOF
+      SECRET_KEY="$SECRET_KEY"
+      DB_USER="$DB_USER"
+      DB_PASS="$DB_PASS"
+      DB_ROOT_PASS="$DB_ROOT_PASS"
+      DB_NAME="$DB_NAME"
+      HOST="$HOST"
+      APP_IMAGE="$REPO"
+      DNEVNIK_ADMIN_PASS="$DNEVNIK_ADMIN_PASS"
+      DNEVNIK_TEACHER_PASS="$DNEVNIK_TEACHER_PASS"
+      DNEVNIK_STUDENT_PASS="$DNEVNIK_STUDENT_PASS"
+      EOF
+    - cat .env
+    - apk update && apk add --no-cache openssh-client   # Full SSH client + agent tools
+    - apk add --no-cache  bash sudo                     # need for eval "$(ssh-agent -s)" 
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh               # need sudo privilege
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/ubuntu_id_rsa
+    - eval "$(ssh-agent -s)"
+    - chmod 600 ~/.ssh/ubuntu_id_rsa
+    - ssh-add ~/.ssh/ubuntu_id_rsa
+    - ssh -i ~/.ssh/ubuntu_id_rsa -o StrictHostKeyChecking=no ${UBUNTU_SSH_USER}@${RUNNER_HOST} "echo Connected OK"
+    - scp $SSH_OPTIONS .env ${UBUNTU_SSH_USER}@${RUNNER_HOST}:/tmp/
+  artifacts:
+    paths: [.env]   
+  tags:
+    - runner1   
+
+
+build-kaniko:
+  stage: build
+  image: 
+    name: gcr.io/kaniko-project/executor:debug
+    entrypoint: [""]
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no  
+  script:
+    - mkdir -p /kaniko/.docker
+    - ls -R
+    - pwd
+    - echo ${CI_PROJECT_DIR}
+    - echo "{\"auths\":{\"$REGISTRY\":{\"username\":\"$DOCKERHUB_USERNAME\",\"password\":\"$DOCKERHUB_TOKEN\"}}}" > /kaniko/.docker/config.json
+    - cp .env {CI_PROJECT_DIR}       #copy .env from artifacts CI
+    - |
+      /kaniko/executor \
+        --context "${CI_PROJECT_DIR}" \
+        --dockerfile "${CI_PROJECT_DIR}/Dockerfile" \
+        --destination "${REPO}:${IMAGE_TAG}"
+  tags:
+    - runner1 
+
+
+
+deploy-ansible-user:
+  stage: deploy-ansible-ssh-user
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ubuntu_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/setup-user-ansible.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/inventory.yml"
+    ANSIBLE_HOST_KEY_CHECKING: false
+  before_script:
+    - mkdir -p /home/gitlab-runner/.ssh
+    - echo "$SSH_PRIVATE_KEY" | tr -d '\r' > /home/gitlab-runner/.ssh/ubuntu_id_rsa
+    - chmod 600 /home/gitlab-runner/.ssh/ubuntu_id_rsa
+    - chmod 700 /home/gitlab-runner/.ssh
+    - chown -R gitlab-runner:gitlab-runner /home/gitlab-runner/.ssh
+    - echo "$SSH_PUBLIC_KEY" >> /home/gitlab-runner/.ssh/authorized_keys    #need to copy from gitlab-ci .env to runner
+    - chmod 600 /home/gitlab-runner/.ssh/authorized_keys
+  script:
+    - pwd && ls -la
+    - ansible tmsdipfin -i $INVENTORY_PATH -m ping  # Test connection
+    - ansible-inventory -i $INVENTORY_PATH --list   #list servers from inventory
+    - ansible-playbook -i $INVENTORY_PATH $PLAYBOOK_PATH  -e "new_user=$ANSIBLE_SSH_USER  new_user_group=$ANSIBLE_SSH_USER ssh_public_key='$ANSIBLE_SSH_PUBLIC_KEY'"
+  tags:
+    - RUN4SHELL 
+  
+
+install-docker-on-backends:
+  stage: install-docker-on-backends
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/install-docker.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/ansible_inventory.yml"
+    ANSIBLE_HOST_KEY_CHECKING: false
+  script:
+    - ansible tmsdipfin -i $INVENTORY_PATH -m ping  # Test connection
+    - ansible-playbook -i $INVENTORY_PATH $PLAYBOOK_PATH  -e "new_user=$ANSIBLE_SSH_USER  new_user_group=$ANSIBLE_SSH_USER ssh_public_key='$ANSIBLE_SSH_PUBLIC_KEY'"
+  tags:
+    - RUN4SHELL 
+
+
+
+
+deploy-app-hostb1:
+  stage: deploy-app-hostb1
+  image: alpine
+  needs: ["build-kaniko","deploy-ansible-user"]
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    APP_IMAGE: ${REPO}:${IMAGE_TAG}
+  before_script:
+    - apk update && apk add --no-cache openssh-client   # Full SSH client + agent tools1
+    - apk add --no-cache  bash sudo  # need for eval "$(ssh-agent -s)" 
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh          #need sudo privilege
+    - echo "$ANSIBLE_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/ansible_id_rsa 
+    - chmod 600 ~/.ssh/ansible_id_rsa
+    - echo ${CI_PROJECT_DIR}
+    - mkdir -p ~/.ssh
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/ansible_id_rsa
+    - ssh-keyscan -H "${HOSTB1}" >> ~/.ssh/known_hosts  2>/dev/null || true    # if fail don`t stop stage
+    - chmod 644 ~/.ssh/known_hosts
+    - mkdir -p ${PRJ_DIR}    #need sudo11
+    - cd ${CI_PROJECT_DIR}
+    - scp $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${RUNNER_HOST}:/tmp/.env  .
+    - mkdir -p ~/kaniko/.docker/
+    - echo "{\"auths\":{\"$REGISTRY\":{\"username\":\"$DOCKERHUB_USERNAME\",\"password\":\"$DOCKERHUB_TOKEN\"}}}" > ~/kaniko/.docker/config.json
+    - pwd
+    - ls -la   
+  script:
+    - scp $SSH_OPTIONS ${CI_PROJECT_DIR}/.env ${ANSIBLE_SSH_USER}@${HOSTB1}:${PRJ_DIR}
+    - scp $SSH_OPTIONS ${CI_PROJECT_DIR}/compose.yml ${ANSIBLE_SSH_USER}@${HOSTB1}:${PRJ_DIR}
+    - scp $SSH_OPTIONS ${CI_PROJECT_DIR}/sql/init.sql ${ANSIBLE_SSH_USER}@${HOSTB1}:${PRJ_DIR}        
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB1} "cd ${PRJ_DIR} && mkdir -p sql && mv init.sql sql/init.sql"  #need copy init.sql in compose.yml
+
+    - echo "${APP_IMAGE}"
+    - export APP_IMAGE="${APP_IMAGE}"
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB1} "cd ${PRJ_DIR} &&  docker compose down -v " 
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB1} "cd ${PRJ_DIR} &&  docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_TOKEN " 
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB1} "cd ${PRJ_DIR} &&  docker pull ${APP_IMAGE} "  
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB1} "cd ${PRJ_DIR} &&  docker compose up -d "  
+  tags:
+    - runner1     
+
+
+
+deploy-app-hostb2:
+  stage: deploy-app-hostb2
+  image: alpine
+  needs: ["deploy-app-hostb1","build-kaniko"]
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    APP_IMAGE: ${REPO}:${IMAGE_TAG}
+  before_script:
+    - apk update && apk add --no-cache openssh-client   # Full SSH client + agent tools1
+    - apk add --no-cache  bash sudo  # need for eval "$(ssh-agent -s)" 
+    - mkdir -p ~/.ssh && chmod 700 ~/.ssh          #need sudo privilege1
+    - echo "$ANSIBLE_SSH_PRIVATE_KEY" | tr -d '\r' > ~/.ssh/ansible_id_rsa 
+    - chmod 600 ~/.ssh/ansible_id_rsa
+    - echo ${CI_PROJECT_DIR}
+    - mkdir -p ~/.ssh
+    - eval "$(ssh-agent -s)"
+    - ssh-add ~/.ssh/ansible_id_rsa
+    - ssh-keyscan -H "${HOSTB2}" >> ~/.ssh/known_hosts  2>/dev/null || true    # if fail don`t stop stage
+    - chmod 644 ~/.ssh/known_hosts
+    - mkdir -p ${PRJ_DIR}    #need sudo11
+    - cd ${CI_PROJECT_DIR}
+    - scp $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${RUNNER_HOST}:/tmp/.env  .
+    - mkdir -p ~/kaniko/.docker/
+    - echo "{\"auths\":{\"$REGISTRY\":{\"username\":\"$DOCKERHUB_USERNAME\",\"password\":\"$DOCKERHUB_TOKEN\"}}}" > ~/kaniko/.docker/config.json
+    - pwd
+    - ls -la   
+  script:
+    - scp $SSH_OPTIONS ${CI_PROJECT_DIR}/.env ${ANSIBLE_SSH_USER}@${HOSTB2}:${PRJ_DIR}
+    - scp $SSH_OPTIONS ${CI_PROJECT_DIR}/compose.yml ${ANSIBLE_SSH_USER}@${HOSTB2}:${PRJ_DIR}
+    - scp $SSH_OPTIONS ${CI_PROJECT_DIR}/sql/init.sql ${ANSIBLE_SSH_USER}@${HOSTB2}:${PRJ_DIR}        
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB2} "cd ${PRJ_DIR} && mkdir -p sql && mv init.sql sql/init.sql"  #need copy init.sql in compose.yml
+
+    - echo "${APP_IMAGE}"
+    - export APP_IMAGE="${APP_IMAGE}"
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB2} "cd ${PRJ_DIR} &&  docker compose down -v "
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB2} "cd ${PRJ_DIR} &&  docker login -u $DOCKERHUB_USERNAME -p $DOCKERHUB_TOKEN "  
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB2} "cd ${PRJ_DIR} &&  docker pull ${APP_IMAGE} "  
+    - ssh $SSH_OPTIONS ${ANSIBLE_SSH_USER}@${HOSTB2} "cd ${PRJ_DIR} &&  docker compose up -d "  
+  tags:
+    - runner1     
+
+
+healthcheck-b1:
+  stage: healthcheck-b1
+  image: alpine/curl:8.17.0
+  needs: ["deploy-app-hostb1"]
+  variables:
+    GIT_DEPTH: 0           # Отключаем shallow clone
+    GIT_STRATEGY: clone    # Полный клон
+    GIT_CLEAN_FLAGS: -ffdx # Очистка перед клоном
+  before_script:
+    - rm -rf .git/shallow  # Удаляем shallow файл
+  script:
+  - |
+    echo "Waiting"
+    sleep 20
+    netstat -tulpn
+    curl -f http://${HOSTB1}:5000/
+  tags:
+    - runner1
+
+healthcheck-b2:
+  stage: healthcheck-b2
+  image: alpine/curl:8.17.0
+  needs: ["deploy-app-hostb2", "healthcheck-b1"]
+  variables:
+    GIT_DEPTH: 0           # Отключаем shallow clone
+    GIT_STRATEGY: clone    # Полный клон
+    GIT_CLEAN_FLAGS: -ffdx # Очистка перед клоном
+  before_script:
+    - rm -rf .git/shallow  # Удаляем shallow файл
+  script:
+  - |
+    echo "Waiting"
+    sleep 30
+    netstat -tulpn
+    curl -f http://${HOSTB2}:5000/
+  tags:
+    - runner1
+
+
+cleanup-env-files:
+  stage: cleanup-env-files
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+  script:
+    # Удаление .env файлов на HOSTB1 и HOSTB2
+    - ssh $SSH_OPTIONS ansible@"${HOSTB1}" "rm -f /tmp/.env /home/ansible/tmsdipfin/.env"
+    - ssh $SSH_OPTIONS ansible@"${HOSTB2}" "rm -f /tmp/.env /home/ansible/tmsdipfin/.env"
+    # Проверка удаления .env на B1-B2
+    - ssh $SSH_OPTIONS ansible@"${HOSTB1}" "ls -la /tmp/.env /home/ansible/tmsdipfin/.env 2>/dev/null || echo 'Файлы удалены или не существуют'"
+    - ssh $SSH_OPTIONS ansible@"${HOSTB2}" "ls -la /tmp/.env /home/ansible/tmsdipfin/.env 2>/dev/null || echo 'Файлы удалены или не существуют'"
+  tags:   
+    - RUN4SHELL   
+
+
+install-nginx-f2:
+  stage: install-nginx-f2
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/deploy-nginx.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/ansible_inventory.yml"
+  before_script:
+   #- sudo apt-get update -qq
+   #- sudo apt-get install -y ansible openssh-client
+   #- mkdir -p ~/.ssh
+   #- echo "$ANSIBLE_SSH_PRIVATE_KEY" > ~/.ssh/ansible_id_rsa && chmod 600 ~/.ssh/ansible_id_rsa
+   - ssh-keyscan -H "${HOSTF2}" >> ~/.ssh/known_hosts  2>/dev/null || true    # if fail don`t stop stage
+   
+   #- chmod 644 ~/.ssh/known_hosts
+   #- echo  "$INVENTORY_PATH"
+   #- cat "$INVENTORY_PATH"
+   #- echo "$PLAYBOOK_PATH"
+   #- cat "$PLAYBOOK_PATH"
+   - ansible-playbook -i  "$INVENTORY_PATH" "$PLAYBOOK_PATH" --limit U22DIPF2 --syntax-check
+  script:
+   - ansible-inventory -i "$INVENTORY_PATH" --graph
+   - ansible-playbook -i "$INVENTORY_PATH" "$PLAYBOOK_PATH"  --limit U22DIPF2 -vvv
+  tags:
+    - RUN4SHELL   
+
+install-nginx-f1:
+  stage: install-nginx-f1
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/deploy-nginx.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/ansible_inventory.yml"
+  before_script:
+   #- sudo apt-get update -qq
+   #- sudo apt-get install -y ansible openssh-client
+   #- mkdir -p ~/.ssh
+   - echo "$ANSIBLE_SSH_PRIVATE_KEY" > ~/.ssh/ansible_id_rsa && chmod 600 ~/.ssh/ansible_id_rsa
+   - ssh-keyscan -H "${HOSTF1}" >> ~/.ssh/known_hosts  2>/dev/null || true    # if fail don`t stop stage12111
+   - chmod 644 ~/.ssh/known_hosts
+   - ansible-playbook -i  "$INVENTORY_PATH" "$PLAYBOOK_PATH" --limit U22DIPF1 --syntax-check
+  script:
+   - ansible-inventory -i "$INVENTORY_PATH" --graph
+   - ansible-playbook -i "$INVENTORY_PATH" "$PLAYBOOK_PATH"  --limit U22DIPF1 -vvv
+  tags:
+    - RUN4SHELL      
+
+
+
+install-keepalived-f2:
+  stage: install-keepalived-f2
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/frontend-ha.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/frontend-ha.yml"
+  before_script:
+  # - sudo apt-get update -qq
+  # - sudo apt-get install -y ansible openssh-client
+  # - mkdir -p ~/.ssh
+  # - echo "$ANSIBLE_SSH_PRIVATE_KEY" > ~/.ssh/ansible_id_rsa && chmod 600 ~/.ssh/ansible_id_rsa
+   - ssh-keyscan -H "${HOSTF1}" >> ~/.ssh/known_hosts  2>/dev/null || true    # if fail don`t stop stage12111
+   - chmod 644 ~/.ssh/known_hosts
+   - ansible-playbook -i  "$INVENTORY_PATH" "$PLAYBOOK_PATH" --limit U22DIPF2 --syntax-check
+  script:
+   - ansible-inventory -i "$INVENTORY_PATH" --graph
+   - ansible-playbook -i "$INVENTORY_PATH" "$PLAYBOOK_PATH"  --limit U22DIPF2 -vvv #122111
+  tags:
+    - RUN4SHELL     
+
+
+
+install-keepalived-f1:
+  stage: install-keepalived-f1
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/frontend-ha.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/frontend-ha.yml"
+  before_script:
+  # - sudo apt-get update -qq
+  # - sudo apt-get install -y ansible openssh-client
+  # - mkdir -p ~/.ssh
+  # - echo "$ANSIBLE_SSH_PRIVATE_KEY" > ~/.ssh/ansible_id_rsa && chmod 600 ~/.ssh/ansible_id_rsa
+   - ssh-keyscan -H "${HOSTF1}" >> ~/.ssh/known_hosts  2>/dev/null || true    # if fail don`t stop stage12111
+   - chmod 644 ~/.ssh/known_hosts
+   - ansible-playbook -i  "$INVENTORY_PATH" "$PLAYBOOK_PATH" --limit U22DIPF1 --syntax-check
+  script:
+   - ansible-inventory -i "$INVENTORY_PATH" --graph
+   - ansible-playbook -i "$INVENTORY_PATH" "$PLAYBOOK_PATH"  --limit U22DIPF1 -vvv #1221111
+  tags:
+    - RUN4SHELL     
+
+
+conf-iptables-frontend:
+  stage: conf-iptables-frontend
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/conf-iptables.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/ansible_inventory.yml"
+  script:
+    - ansible-playbook -i $INVENTORY_PATH  $PLAYBOOK_PATH
+  tags:
+    - RUN4SHELL  
+  
+    
+install-zabbix:
+  stage: install-zabbix
+  variables:
+    SSH_OPTIONS: -i ~/.ssh/ansible_id_rsa -o StrictHostKeyChecking=no
+    PLAYBOOK_PATH: "${CI_PROJECT_DIR}/ansible/playbooks/install-zabbix.yml"
+    INVENTORY_PATH: "${CI_PROJECT_DIR}/ansible/inventories/ansible_inventory.yml"
+  before_script:
+    - sudo apt-get update -y 
+  script:
+    - ansible-playbook -i $INVENTORY_PATH   $PLAYBOOK_PATH -e "zabbix_user=$ZABBIX_USER" -e "zabbix_agent_server=$ZABBIX_SERVER" 
+  tags:
+    - RUN4SHELL 
+
+

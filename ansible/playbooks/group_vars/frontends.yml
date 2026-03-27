@@ -1,0 +1,23 @@
+site_domain: "tmsdipfin.altezza.org"
+nginx_port: 80
+nginx_ssl_port: 443
+
+#ssl path for task/install-nignx/main.yml
+item.src : 'templates/nginx.conf.j2'
+item.dest : '/etc/nginx/sites-enabled/tmsdipfin.altezza.org'
+
+nginx_template:
+  src: "nginx.conf.j2"
+  dest: "/etc/nginx/sites-available/tmsdipfin.altezza.org"
+  
+ssl_cert_path: "/etc/nginx/ssl/tmsdipfin.altezza.org.crt"
+ssl_key_path: "/etc/nginx/ssl/tmsdipfin.altezza.org.key"
+nginx_ssl_cert: "{{ lookup('env','SSL_CERT') | default('') }}"
+nginx_ssl_key: "{{ lookup('env','SSL_KEY') | default('') }}"
+nginx_domain: "tmsdipfin.altezza.org"
+
+
+vip_address : 192.168.100.100
+keepalived_vrid: 150
+keepalived_password: "{{ lookup('env','KEEPALIVED_PASSWORD') | default('defaultp') | truncate(8) }}"
+network_interface: "{{ ansible_default_ipv4.interface }}"

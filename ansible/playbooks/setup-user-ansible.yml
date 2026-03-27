@@ -1,0 +1,11 @@
+---
+- name: Setup user configuration
+  hosts: tmsdipfin
+  become: yes
+  vars:
+    new_user: "{{ new_user |  default('ansible') }}"
+    ssh_public_key: "{{ ssh_public_key }}"
+    new_user_group: "{{ new_user_group | default('ansible') }}"
+  roles:
+    - setup-user  
+    

@@ -1,0 +1,27 @@
+{% extends "base.html" %}
+{% block title %}Посещаемость{% endblock %}
+{% block content %}
+<h2>Посещаемость группы {{ group.name }} на {{ att_date }}</h2>
+<form method="post" action="{{ url_for('main.attendance_mark', group_id=group.id) }}">
+  <input type="hidden" name="date" value="{{ att_date }}">
+  <table class="table table-bordered">
+    <thead>
+      <tr>
+        <th>Студент</th>
+        <th>Присутствует</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for student in students %}
+      <tr>
+        <td>{{ student.name }}</td>
+        <td>
+          <input type="checkbox" name="present_{{ student.id }}" {% if records.get(student.id) and records.get(student.id).present %}checked{% endif %}>
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  <button type="submit" class="btn btn-primary">Сохранить</button>
+</form>
+{% endblock %}

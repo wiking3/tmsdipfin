@@ -1,0 +1,25 @@
+{% extends "base.html" %}
+{% block title %}Главная - Журнал преподавателя{% endblock %}
+
+{% block content %}
+<div class="container">
+    <div class="py-4">
+        <h1>Добро пожаловать в Журнал преподавателя</h1>
+        {% if current_user.is_authenticated %}
+        <p>Здравствуйте, {{ current_user.username }}!</p>
+        <div class="btn-group mb-3" role="group" aria-label="Главное меню">
+            <a href="{{ url_for('main.groups') }}" class="btn btn-primary">Группы</a>
+            <a href="{{ url_for('main.students') }}" class="btn btn-primary">Студенты</a>
+            <a href="{{ url_for('main.attendance', group_id=1) }}" class="btn btn-primary">Посещаемость</a>
+            <a href="{{ url_for('main.homework_list', group_id=1) }}" class="btn btn-primary">Домашние задания</a>
+        </div>
+        <p>Используйте меню выше для управления данными.</p>
+        {% else %}
+        <div class="alert alert-info">
+            Пожалуйста, войдите под своим аккаунтом для доступа к журналу.
+        </div>
+        <a class="btn btn-success" href="{{ url_for('main.login') }}">Вход</a>
+        {% endif %}
+    </div>
+</div>
+{% endblock %}

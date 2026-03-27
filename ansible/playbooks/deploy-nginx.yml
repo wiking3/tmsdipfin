@@ -1,0 +1,8 @@
+---
+- name: Deploy nginx frontend
+  hosts: frontends
+  vars_files:               
+    - "group_vars/frontends.yml"
+  become: yes
+  roles:
+    - install-nginx

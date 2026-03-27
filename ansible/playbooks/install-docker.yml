@@ -1,0 +1,8 @@
+---
+- name:  Apt-update and install Docker on backends hosts
+  hosts: backends
+  become: yes
+  vars:
+    new_user: "{{ new_user }}"    # user- ansible to add docker group
+  roles:
+    - install-docker  

@@ -1,0 +1,12 @@
+---
+- name: Configure iptables firewall for frontend
+  hosts: frontends
+  become: true
+  roles:
+    - conf-iptables
+  vars:
+    allowed_ports:
+      - 22   # SSH
+      - 80   # HTTP  
+      - 443  # HTTPS
+      - 10050  # zabbix

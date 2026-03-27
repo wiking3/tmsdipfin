@@ -1,0 +1,14 @@
+---
+- name: Install ZabbixAgent2  on Ubuntu 22.04
+  hosts: tmsdipfin
+  become: yes
+  roles:
+    - role: install-zabbix
+  vars:  
+    zabbix_agent_server: "192.168.100.50"
+    zabbix_agent_server_active: "192.168.100.50"
+    zabbix_agent_hostname: "{{ inventory_hostname }}"
+    zabbix_agent_repo_url: "https://repo.zabbix.com/zabbix/7.0/ubuntu/pool/main/z/zabbix-release/zabbix-release_7.0-1+ubuntu22.04_all.deb"
+    zabbix_agent_release_pkg: "zabbix-release_7.0-1+ubuntu22.04_all.deb"
+    zabbix_systemd_service: "zabbix-agent2"
+    zabbix_agent_log_file: "/var/log/zabbix/zabbix_agent2.log"

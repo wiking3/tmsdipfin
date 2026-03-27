@@ -1,0 +1,12 @@
+# Zabbix Agent 2 configuration managed by Ansible
+PidFile=/run/zabbix/zabbix_agent2.pid
+LogFile=/var/log/zabbix/zabbix_agent2.log
+LogFileSize=1024
+DebugLevel=3
+SourceIP=
+Hostname={{ zabbix_agent_hostname }}
+HostnameItem=system.uname
+ListenPort=10050
+ListenIP=0.0.0.0
+Server={{ zabbix_agent_server }}
+ServerActive={{ zabbix_agent_server_active }}

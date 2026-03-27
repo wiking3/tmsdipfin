@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Группы{% endblock %}
+{% block content %}
+<h2>Группы</h2>
+<a href="{{ url_for('main.group_add') }}" class="btn btn-success mb-2">Добавить группу</a>
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Название</th>
+      <th>Действия</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for group in groups %}
+    <tr>
+      <td>{{ group.name }}</td>
+      <td>
+        <a href="{{ url_for('main.homework_list', group_id=group.id) }}" class="btn btn-info btn-sm">Домашние задания</a>
+        <a href="{{ url_for('main.attendance', group_id=group.id) }}" class="btn btn-warning btn-sm">Посещаемость</a>
+        <a href="{{ url_for('main.group_delete', group_id=group.id) }}" class="btn btn-danger btn-sm">Удалить</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

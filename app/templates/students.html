@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block title %}Студенты{% endblock %}
+{% block content %}
+<h2>Студенты</h2>
+<a href="{{ url_for('main.student_add') }}" class="btn btn-success mb-2">Добавить студента</a>
+<table class="table table-bordered">
+  <thead>
+    <tr>
+      <th>Имя</th>
+      <th>Группа</th>
+      <th>Действия</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for student in students %}
+    <tr>
+      <td>{{ student.name }}</td>
+      <td>{{ student.group.name if student.group else "" }}</td>
+      <td>
+        <a href="{{ url_for('main.student_delete', student_id=student.id) }}" class="btn btn-danger btn-sm">Удалить</a>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+{% endblock %}

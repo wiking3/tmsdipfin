@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}Добавить группу{% endblock %}
+{% block content %}
+<h2>Добавить группу</h2>
+<form method="post">
+  {{ form.hidden_tag() }}
+  {{ form.name.label }} {{ form.name(class="form-control") }}
+  <br>
+  {{ form.submit(class="btn btn-success") }}
+</form>
+{% endblock %}

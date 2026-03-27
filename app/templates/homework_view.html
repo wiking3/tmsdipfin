@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}ДЗ: {{ hw.title }}{% endblock %}
+{% block content %}
+<h2>{{ hw.title }}</h2>
+<b>Дата публикации:</b> {{ hw.publish_date }}<br>
+<b>Дедлайн:</b> {{ hw.deadline }}<br>
+<hr>
+<div class="mb-4">
+  {{ render_content | safe }}
+</div>
+{% if is_student %}
+  {% if can_update %}
+    <form method="post" action="{{ url_for('main.homework_submit', hw_id=hw.id) }}">
+      {{ submission.github_url if submission else "" }}
+      {{ form.hidden_tag() }}
+      {{ form.github_url.label }} {{ form.github_url(class="form-control", value=submission.github_url if submission else "") }}
+      <br>
+      {{ form.submit(class="btn btn-success") }}
+    </form>
+  {% else %}
+    <b>Дедлайн истек. Ссылка больше не принимается.</b>
+    <br>
+    {% if submission %}
+      <b>Ваша последняя ссылка:</b>
+      {{ submission.github_url }}
+    {% endif %}
+  {% endif %}
+{% endif %}
+{% endblock %}

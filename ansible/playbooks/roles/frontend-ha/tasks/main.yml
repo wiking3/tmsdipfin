@@ -1,0 +1,96 @@
+---
+- name: Install prerequisites
+  apt:
+    name:
+      - curl
+      - wget
+      - gnupg2
+      - software-properties-common
+      - sysstat
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Install Keepalived
+  apt:
+    name: keepalived
+    state: present
+  become: yes
+
+- name: Configure sysctl for VIP
+  sysctl:
+    name: "{{ item.name }}"
+    value: "{{ item.value }}"
+    state: present
+    sysctl_set: yes
+    reload: yes
+  loop:
+    - { name: 'net.ipv4.ip_nonlocal_bind', value: '1' }
+    - { name: 'net.ipv4.conf.all.arp_ignore', value: '1' }
+    - { name: 'net.ipv4.conf.all.arp_announce', value: '2' }
+    - { name: 'net.ipv4.conf.{{ network_interface }}.arp_ignore', value: '1' }
+    - { name: 'net.ipv4.conf.{{ network_interface }}.arp_announce', value: '2' }
+  become: yes
+
+- name: Create nginx healthcheck script
+  copy:
+    dest: /usr/local/bin/check-nginx.sh
+    content: |
+      #!/bin/bash
+      if systemctl is-active --quiet nginx || curl -f http://127.0.0.1/health 2>/dev/null; then
+        echo "NGINX OK"
+        exit 0
+      else
+        echo "NGINX FAIL"
+        exit 1
+      fi
+    mode: '0755'
+  become: yes
+  notify: restart keepalived
+
+- name: Configure Keepalived
+  template:
+    src: keepalived.conf.j2
+    dest: /etc/keepalived/keepalived.conf
+    mode: '0644'
+    #validate: '/usr/sbin/keepalived -t -f %s'
+  become: yes
+  notify: restart keepalived
+  vars:
+    is_master: "{{ inventory_hostname == 'U22DIPF1' }}"
+    priority: "{{ 150 if is_master else 100 }}"
+
+- name: Enable and start Keepalived
+  systemd:
+    name: keepalived
+    enabled: yes
+    state: started
+  become: yes
+
+- name: Wait for VIP assignment (MASTER only)
+  wait_for_connection:
+    delay: 5
+    timeout: 30
+  when: is_master | default(false)
+  delegate_to: "{{ inventory_hostname }}"
+
+- name: Show Keepalived status
+  shell: |
+    systemctl status keepalived --no-pager -l | head -20
+  register: keepalived_status
+  changed_when: false
+  become: yes
+
+- name: Show VIP status
+  shell: |
+    ip addr show {{ network_interface }} | grep {{ vip_address }} || echo "VIP NOT ASSIGNED"
+  register: vip_status
+  changed_when: false
+  become: yes
+
+- name: Display results
+  debug:
+    msg: |
+      Keepalived: {{ keepalived_status.stdout }}
+      VIP Status: {{ vip_status.stdout }}
+
