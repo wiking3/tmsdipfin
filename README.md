@@ -26,13 +26,13 @@ Ansible-выполняет через плейбуки следующие зад
  \-install-docker \- устанавливает докер на сервера роли backends.  
  \-deploy-nginx \- устанавливает nginx на сервера роли frontend и настраивает через шаблон j2.  
  \-frontend-ha \- устанавливает keepalived и настраивает через шаблон j2.   
- \-conf-iptabels  \- на сервера роли frontends настраивает iptables (разрешает tcp/22, tcp/80, tcp/443, VRRP, icmp).
- \-install-zabbix  \- установка zabbix-agent2 на все сервера инфрастуктуры (HOSTF1-2, HOSTB1-B2).
- 
+ \-conf-iptabels  \- на сервера роли frontends настраивает iptables (разрешает tcp/22, tcp/80, tcp/443, VRRP, icmp).  
+ \- install-zabbix  \- установка zabbix-agent2 на все сервера инфрастуктуры (HOSTF1-2, HOSTB1-B2).
+
  В инфрастуктуре используется 4 сервера :   
   HOSTB1: 192.168.100.123  
   HOSTB2: 192.168.100.124  
   HOSTF1: 192.168.100.121  
   HOSTF2: 192.168.100.122  
   runner1 :  192.168.100.116         \- (docker executor) \- для деплоя приложения на сервера HOSTB1-B2  
-  RUN4SHELL : 192.168.100.131 \- (shell executor) \- для выполнения ansible playbook \- для настройки инфраструктуры. 
+  RUN4SHELL : 192.168.100.131 \- (shell executor) \- для выполнения ansible playbook \- для настройки инфраструктуры.  
