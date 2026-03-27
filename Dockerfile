@@ -1,8 +1,8 @@
-FROM python:3.12-slim AS builder
+FROM python:3.12-slim AS builder           
 WORKDIR /app
 #python logs to stdout 
-ENV PYTHONDONTWRITEBYTECODE=1 \
-    PYTHONUNBUFFERED=1                              
+ENV PYTHONDONTWRITEBYTECODE=1 \           #Отключает создание .pyc файлов 
+    PYTHONUNBUFFERED=1                    #Включает вывод stdout и stderr - если Python приложение упадет - то в лог докер-контенера выпадет error          
 
 # install only compiliers for build 
 RUN apt-get update && apt-get install -y --no-install-recommends \
