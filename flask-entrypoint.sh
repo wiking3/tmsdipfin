@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-  set -e
+  set -e                                        #force exit script if failed
   echo "Waiting for mysql ready..."
   while ! </dev/tcp/db/3306; do
      echo "MySQL not ready - sleeping..."
@@ -8,9 +8,9 @@
   echo "MySQL ready!"
 
   # Load environment variables
-  set -a  # Auto-export variables
+  set -a  # Auto-export enviroment variables 
   source .env  # Load from .env
-  #set +a
+  #set +a      
 
   sleep 2
   
