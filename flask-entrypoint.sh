@@ -15,15 +15,15 @@
   sleep 2
   
   # Initialize migrations if needed
-  if [ -d "migrations" ] && [ "$(ls -A migrations)" ]; then
+  if [ -d "migrations" ] && [ "$(ls -A migrations)" ]; then          # check if exist folder migrations and if have files
     echo "Migrations exist, skipping init..."
   else
-    flask db init
+    flask db init                                                    # init db mysql  
   fi
   flask db migrate -m 'create initial tables'
-  flask db upgrade
+  flask db upgrade                                                   # apply migrations to bd
   
-  #API_HOST="dnevnik" 
+
 
   # Create initial users using env vars
   echo "Creating initial users..."
