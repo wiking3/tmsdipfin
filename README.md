@@ -1,14 +1,16 @@
-  Приложение Dnevnik преподавателя предназначено для ведения учета выполнения домешних заданий студентов.   
+##  Приложение Dnevnik преподавателя предназначено для ведения учета выполнения домешних заданий студентов.   
   Написано на Flask c БД mysql 8.0 через python-библиотеку SQLAclhemy.  
   Предполагается разворачивание внутри сети компании через инструменты  Gitlab CI/CD \+ Ansible.  
   Реализован балансировщик на базе nginx+keepalived на серверах группы frondents. Докерезировано. Используется 2 сервера в качестве backend и 2 в качестве frontend. Динамически генерируется .env файл, копируется на сервера роли backend для docker-compose и в конце деплоя удаляется. Все пароли/ключи хранятся в переменных Gitlab CI.
 
 Запуск приложение проихводится через отдельный  BASH-скрипт flask-entrypoint.sh :   
 Инициализация БД :   
+```bash
   flask db init  
   flask db migrate \-m 'create initial tables'  
   flask db upgrade   
-    
+```
+
 Также создаются учетные записи пользователей teacher1-2, student1-2, admin :  
   flask create-user teacher1 "$DNEVNIK\_TEACHER\_PASS" teacher  
   flask create-user teacher2 "$DNEVNIK\_TEACHER\_PASS" teacher  
