@@ -12,13 +12,14 @@
 ```
 
 Также создаются учетные записи пользователей teacher1-2, student1-2, admin :  
+```bash
   flask create-user teacher1 "$DNEVNIK\_TEACHER\_PASS" teacher  
   flask create-user teacher2 "$DNEVNIK\_TEACHER\_PASS" teacher  
   flask create-user student1 "$DNEVNIK\_STUDENT\_PASS" student  
   flask create-user student2 "$DNEVNIK\_STUDENT\_PASS" student  
   flask create-user admin "$DNEVNIK\_ADMIN\_PASS" admin
-
-  Запуск приложения : flask run \--host 0.0.0.0 \--port 5000  
+```
+  Запуск приложения : `flask run \--host 0.0.0.0 \--port 5000`  
     
   Нужны следующие requirements : Flask==2.3.3, Flask-SQLAlchemy==3.0.5 , Flask-Migrate==4.0.5 ,Flask-Login, Flask-WTF , flask\_pagedown  
 bcrypt, mysqlclient==2.2.8 , markdown , python-dotenv , PyMySQL==1.1.0 , cryptography==42.0.8 , pylint ,click.
